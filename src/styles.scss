@@ -1,1 +1,26 @@
 /* You can add global styles to this file, and also import other style files */
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    background: #d6e6ff;
+    position: relative;
+}
+
+.mat-horizontal-stepper-header-container {
+    pointer-events: none !important;
+}
+
+@media screen and (max-width: 600px) {
+    .mat-horizontal-content-container {
+      padding: 0 !important;
+    }
+  }
+
+
