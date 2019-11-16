@@ -6,4 +6,4 @@ Accepts any restrictions unless not possible.
 
 Visible on [audrenbdb.github.io](audrenbdb.github.io)
 
--> Built with angular 9
+*Built with angular 9*
