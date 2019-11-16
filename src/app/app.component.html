@@ -30,7 +30,7 @@
             <form autocomplete="off" [formGroup]="addMemberForm" #formDirective="ngForm" (ngSubmit)="addMember(addMemberForm, formDirective)"
                 id="add-member">
                 <mat-form-field class="add-member-field">
-                    <input autocomplete="off" formControlName="name" matInput placeholder="Nom d'un autre participant" type="search" name="{{randomName}}">
+                    <input autocomplete="off" formControlName="name" matInput placeholder="Nom d'un autre participant" type="text" name="{{randomName}}">
                     <button type="submit" form="add-member" mat-icon-button matSuffix color="warn"
                         aria-label="add member icon">
                         <mat-icon color="primary">add_circle</mat-icon>

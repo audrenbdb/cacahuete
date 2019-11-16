@@ -13,14 +13,4 @@ body {
     position: relative;
 }
 
-.mat-horizontal-stepper-header-container {
-    pointer-events: none !important;
-}
-
-@media screen and (max-width: 600px) {
-    .mat-horizontal-content-container {
-      padding: 0 !important;
-    }
-  }
-
 
