@@ -46,6 +46,13 @@ export class AppComponent implements OnInit {
     })
     this.getRolls();
     formDirective.reset();
+    this.scroll();
+  }
+
+  scroll() {
+    setTimeout(() => {
+      document.querySelector('#anchor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
   }
 
   screenResult() {
@@ -73,6 +80,9 @@ export class AppComponent implements OnInit {
   goNext() {
     if (!this.rolls.length) return;
     this.resetFocus();
+    setTimeout(() => {
+      this.step = 2;
+    }, 100);
     this.step = 2;
     
     setTimeout(() => {
