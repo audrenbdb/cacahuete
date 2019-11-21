@@ -7,7 +7,7 @@
         </div>
         <div class="step-content">
             <div class="members-list">
-                <mat-accordion>
+                <mat-accordion class="members-accordion">
                     <mat-expansion-panel *ngFor="let member of members">
                         <mat-expansion-panel-header>
                             <mat-panel-title>{{member.name}}</mat-panel-title>
@@ -42,7 +42,7 @@
             <button [disabled]="!rolls.length" mat-flat-button color="primary" (click)="goNext()">Lancer le
                 tirage</button>
         </div>
-        <span id="anchor"></span>
+        <div class="anchor" data-html2canvas-ignore="true"></div>
     </div>
     <div class="step" *ngIf="step === 2">
         <div class="step-header">
@@ -81,6 +81,7 @@
                 color="primary" download="cacahuete.png">Capture d'écran</a>
         </div>
     </div>
+    <div class="anchor" data-html2canvas-ignore="true"></div>
 </div>
 
 

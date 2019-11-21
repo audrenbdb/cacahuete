@@ -51,8 +51,8 @@ export class AppComponent implements OnInit {
 
   scroll() {
     setTimeout(() => {
-      document.querySelector('#anchor').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 50);
+      document.querySelector('.anchor').scrollIntoView({ block: 'center' });
+    }, 60);
   }
 
   screenResult() {
@@ -82,9 +82,8 @@ export class AppComponent implements OnInit {
     this.resetFocus();
     setTimeout(() => {
       this.step = 2;
-    }, 100);
-    this.step = 2;
-    
+    }, 350);
+        
     setTimeout(() => {
       this.rolls.map((pair, i) => {
         this.donors[i] = pair[0].name;
@@ -94,7 +93,7 @@ export class AppComponent implements OnInit {
       setTimeout(() => {
         this.screenResult();
       }, 1150)
-    }, 400)
+    }, 600)
   }
 
   goBack() {
