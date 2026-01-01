@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Add participants, set exclusions, and shuffle Secret Santa assignments!">
+    <meta name="theme-color" content="#16213e">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Secret Santa">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+    
+    <title>Secret Santa Shuffle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            25% {
+                transform: translateY(-20px) rotate(-10deg);
+            }
+
+            50% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            75% {
+                transform: translateY(-10px) rotate(10deg);
+            }
+        }
+
+        .bouncing {
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .result-item {
+            opacity: 0;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            }
+        }
+
+        .progress-glow {
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page-active {
+            display: block;
+        }
+
+        .page-loading {
+            display: flex !important;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #threeCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        #loadingPage .text-center {
+            position: relative;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-red-900 via-green-900 to-red-900 text-white">
+
+    <!-- PAGE 1: Configuration -->
+    <div id="configPage" class="page page-active min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold mb-2">🎅 Secret Santa Shuffle 🎄</h1>
+                <p id="subtitle" class="text-gray-300">Add participants, set exclusions, and shuffle!</p>
+            </div>
+
+            <!-- Add Participant Section -->
+            <div class="bg-white/10 backdrop-blur rounded-xl p-6 mb-6">
+                <h2 id="addParticipantsTitle" class="text-xl font-semibold mb-4">Add Participants</h2>
+                <div class="flex gap-3">
+                    <input type="text" id="participantName" placeholder="Enter participant name..."
+                        class="flex-1 px-4 py-2 rounded-lg bg-white/20 border border-white/30 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        onkeypress="if(event.key === 'Enter') addParticipant()">
+                    <button onclick="addParticipant()" id="addBtn"
+                        class="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
+                        Add
+                    </button>
+                </div>
+                <p id="nameError" class="text-red-400 text-sm mt-2 hidden"></p>
+            </div>
+
+            <!-- Participants List -->
+            <div id="participantsSection" class="bg-white/10 backdrop-blur rounded-xl p-6 mb-6 hidden">
+                <h2 class="text-xl font-semibold mb-4"><span id="participantsTitle">Participants</span> (<span
+                        id="participantCount">0</span>)</h2>
+                <div id="participantsList" class="flex flex-wrap gap-2 mb-4"></div>
+            </div>
+
+            <!-- Exclusions Matrix -->
+            <div id="exclusionsSection" class="bg-white/10 backdrop-blur rounded-xl p-6 mb-6 hidden">
+                <h2 id="exclusionsTitle" class="text-xl font-semibold mb-2">Exclusions</h2>
+                <p id="exclusionsDesc" class="text-gray-400 text-sm mb-4">Check the boxes to prevent a participant (row)
+                    from being matched with another (column)</p>
+                <div class="overflow-x-auto">
+                    <table id="exclusionsTable" class="w-full"></table>
+                </div>
+            </div>
+
+            <!-- Validation Message -->
+            <div id="validationMessage" class="mb-6 hidden">
+                <div class="bg-red-500/30 border border-red-500 rounded-xl p-4 text-center">
+                    <p class="font-semibold" id="impossibleTitle">⚠️ Impossible Configuration</p>
+                    <p id="validationText" class="text-sm text-gray-300 mt-1"></p>
+                </div>
+            </div>
+
+            <!-- Shuffle Button -->
+            <div class="text-center mb-8">
+                <button id="shuffleBtn" onclick="startShuffle()"
+                    class="px-8 py-4 bg-gradient-to-r from-red-600 to-green-600 hover:from-red-700 hover:to-green-700 rounded-xl font-bold text-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    disabled>
+                    🎲 Shuffle Participants 🎲
+                </button>
+                <p id="minParticipantsMsg" class="text-gray-400 text-sm mt-2">Add at least 2 participants to shuffle</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: Loading Animation -->
+    <div id="loadingPage" class="page fixed inset-0 bg-gradient-to-br from-red-900 via-green-900 to-red-900 z-50">
+        <canvas id="threeCanvas"></canvas>
+        <div class="text-center">
+            <div class="text-8xl bouncing inline-block mb-8">🎅</div>
+            <h2 id="loadingTitle" class="text-3xl font-bold mb-6">Shuffling the magic...</h2>
+
+            <!-- Progress Bar -->
+            <div class="w-80 mx-auto">
+                <div class="bg-white/20 rounded-full h-4 overflow-hidden progress-glow">
+                    <div id="progressBar"
+                        class="bg-gradient-to-r from-green-500 to-red-500 h-full rounded-full transition-all duration-300 ease-out"
+                        style="width: 0%"></div>
+                </div>
+                <p id="progressText" class="text-lg mt-4 text-gray-300">0%</p>
+            </div>
+
+            <!-- Fun messages -->
+            <p id="loadingMessage" class="text-gray-400 mt-6 text-sm italic">Checking the naughty and nice list...</p>
+        </div>
+    </div>
+
+    <!-- PAGE 3: Results -->
+    <div id="resultsPage" class="page min-h-screen">
+        <div class="container mx-auto px-4 py-8 max-w-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold mb-2">🎁 <span id="resultsTitle">Results</span> 🎁</h1>
+                <p id="resultsSubtitle" class="text-gray-300">Here are the Secret Santa pairings!</p>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur rounded-xl p-6 mb-6">
+                <div id="resultsList" class="space-y-3"></div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="copyResults()" id="copyBtn"
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
+                    📋 <span id="copyBtnText">Copy Results</span>
+                </button>
+                <button onclick="goBackToConfig()" id="backBtn"
+                    class="px-6 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
+                    🔄 <span id="backBtnText">Shuffle Again</span>
+                </button>
+            </div>
+            <p id="copyConfirm" class="text-green-400 text-sm mt-4 text-center hidden">Copied to clipboard!</p>
+        </div>
+    </div>
+
+    <script>
+        // Translations
+        const translations = {
+            en: {
+                title: 'Secret Santa Shuffle',
+                subtitle: 'Add participants, set exclusions, and shuffle!',
+                addParticipants: 'Add Participants',
+                placeholder: 'Enter participant name...',
+                add: 'Add',
+                participants: 'Participants',
+                exclusions: 'Exclusions',
+                exclusionsDesc: 'Check the boxes to prevent a participant (row) from being matched with another (column)',
+                impossibleTitle: '⚠️ Impossible Configuration',
+                impossibleDesc: 'The current exclusion rules make it impossible to match everyone. Please adjust the exclusions.',
+                shuffle: '🎲 Shuffle Participants 🎲',
+                minParticipants: 'Add at least 2 participants to shuffle',
+                loadingTitle: 'Shuffling the magic...',
+                resultsTitle: 'Results',
+                resultsSubtitle: 'Here are the Secret Santa pairings!',
+                copyResults: 'Copy Results',
+                shuffleAgain: 'Shuffle Again',
+                copied: 'Copied to clipboard!',
+                errorEmpty: 'Please enter a name',
+                errorDuplicate: 'This name already exists',
+                loadingMessages: [
+                    'Checking the naughty and nice list...',
+                    'Wrapping gifts with care...',
+                    'Counting candy canes...',
+                    'Feeding the reindeer...',
+                    'Polishing the sleigh...',
+                    'Organizing the workshop...',
+                    'Almost there...'
+                ]
+            },
+            fr: {
+                title: 'Tirage au Sort Secret',
+                subtitle: 'Ajoutez des participants, définissez les exclusions, et mélangez !',
+                addParticipants: 'Ajouter des Participants',
+                placeholder: 'Entrez un nom...',
+                add: 'Ajouter',
+                participants: 'Participants',
+                exclusions: 'Exclusions',
+                exclusionsDesc: 'Cochez les cases pour empêcher un participant (ligne) d\'être associé à un autre (colonne)',
+                impossibleTitle: '⚠️ Configuration Impossible',
+                impossibleDesc: 'Les règles d\'exclusion actuelles rendent impossible l\'attribution de tout le monde. Veuillez ajuster les exclusions.',
+                shuffle: '🎲 Mélanger les Participants 🎲',
+                minParticipants: 'Ajoutez au moins 2 participants pour mélanger',
+                loadingTitle: 'La magie opère...',
+                resultsTitle: 'Résultats',
+                resultsSubtitle: 'Voici les associations du Secret Santa !',
+                copyResults: 'Copier les résultats',
+                shuffleAgain: 'Recommencer',
+                copied: 'Copié dans le presse-papiers !',
+                errorEmpty: 'Veuillez entrer un nom',
+                errorDuplicate: 'Ce nom existe déjà',
+                loadingMessages: [
+                    'Vérification de la liste des sages et des coquins...',
+                    'Emballage des cadeaux avec soin...',
+                    'Comptage des sucres d\'orge...',
+                    'Nourrissage des rennes...',
+                    'Polissage du traîneau...',
+                    'Organisation de l\'atelier...',
+                    'Presque terminé...'
+                ]
+            }
+        };
+
+        // Detect language
+        let currentLang = navigator.language.startsWith('fr') ? 'fr' : 'en';
+        let t = translations[currentLang];
+
+        // State
+        let participants = [];
+        let exclusions = {}; // { "Alice": ["Bob", "Charlie"], ... }
+        let results = []; // [{ giver: "Alice", receiver: "Bob" }, ...]
+
+        // Initialize UI with translations
+        function initTranslations() {
+            document.getElementById('subtitle').textContent = t.subtitle;
+            document.getElementById('addParticipantsTitle').textContent = t.addParticipants;
+            document.getElementById('participantName').placeholder = t.placeholder;
+            document.getElementById('addBtn').textContent = t.add;
+            document.getElementById('participantsTitle').textContent = t.participants;
+            document.getElementById('exclusionsTitle').textContent = t.exclusions;
+            document.getElementById('exclusionsDesc').textContent = t.exclusionsDesc;
+            document.getElementById('impossibleTitle').textContent = t.impossibleTitle;
+            document.getElementById('shuffleBtn').textContent = t.shuffle;
+            document.getElementById('minParticipantsMsg').textContent = t.minParticipants;
+            document.getElementById('loadingTitle').textContent = t.loadingTitle;
+            document.getElementById('resultsTitle').textContent = t.resultsTitle;
+            document.getElementById('resultsSubtitle').textContent = t.resultsSubtitle;
+            document.getElementById('copyBtnText').textContent = t.copyResults;
+            document.getElementById('backBtnText').textContent = t.shuffleAgain;
+            document.title = t.title;
+        }
+
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', initTranslations);
+
+        // Page navigation
+        function showPage(pageId) {
+            const pages = ['configPage', 'loadingPage', 'resultsPage'];
+            pages.forEach(id => {
+                const page = document.getElementById(id);
+                if (id === pageId) {
+                    page.classList.add(id === 'loadingPage' ? 'page-loading' : 'page-active');
+                    page.classList.remove('page');
+                } else {
+                    page.classList.remove('page-active', 'page-loading');
+                    page.classList.add('page');
+                }
+            });
+        }
+
+        // Add a new participant
+        function addParticipant() {
+            const input = document.getElementById('participantName');
+            const name = input.value.trim();
+            const errorEl = document.getElementById('nameError');
+
+            // Validation
+            if (!name) {
+                showError(t.errorEmpty);
+                return;
+            }
+            if (participants.some(p => p.toLowerCase() === name.toLowerCase())) {
+                showError(t.errorDuplicate);
+                return;
+            }
+
+            // Add participant
+            participants.push(name);
+            exclusions[name] = [];
+
+            // Clear input and error
+            input.value = '';
+            errorEl.classList.add('hidden');
+
+            // Update UI
+            updateParticipantsList();
+            updateExclusionsMatrix();
+            validateConfiguration();
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('nameError');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+
+        // Remove a participant
+        function removeParticipant(name) {
+            participants = participants.filter(p => p !== name);
+            delete exclusions[name];
+
+            // Remove from other participants' exclusions
+            Object.keys(exclusions).forEach(key => {
+                exclusions[key] = exclusions[key].filter(e => e !== name);
+            });
+
+            updateParticipantsList();
+            updateExclusionsMatrix();
+            validateConfiguration();
+        }
+
+        // Update participants list display
+        function updateParticipantsList() {
+            const section = document.getElementById('participantsSection');
+            const list = document.getElementById('participantsList');
+            const count = document.getElementById('participantCount');
+
+            if (participants.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            count.textContent = participants.length;
+
+            list.innerHTML = participants.map(name => `
+                <div class="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-2">
+                    <span>${escapeHtml(name)}</span>
+                    <button 
+                        onclick="removeParticipant('${escapeJs(name)}')"
+                        class="text-red-400 hover:text-red-300 font-bold"
+                    >×</button>
+                </div>
+            `).join('');
+        }
+
+        // Update exclusions matrix
+        function updateExclusionsMatrix() {
+            const section = document.getElementById('exclusionsSection');
+            const table = document.getElementById('exclusionsTable');
+
+            if (participants.length < 2) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+
+            let html = '<thead><tr><th class="p-2 text-left"></th>';
+            participants.forEach(name => {
+                html += `<th class="p-2 text-center text-sm font-normal rotate-0">${escapeHtml(name)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            participants.forEach(giver => {
+                html += `<tr><td class="p-2 font-semibold">${escapeHtml(giver)}</td>`;
+                participants.forEach(receiver => {
+                    if (giver === receiver) {
+                        html += '<td class="p-2 text-center"><span class="text-gray-500">—</span></td>';
+                    } else {
+                        const isExcluded = exclusions[giver]?.includes(receiver);
+                        html += `
+                            <td class="p-2 text-center">
+                                <input 
+                                    type="checkbox" 
+                                    ${isExcluded ? 'checked' : ''}
+                                    onchange="toggleExclusion('${escapeJs(giver)}', '${escapeJs(receiver)}')"
+                                    class="w-4 h-4 rounded accent-red-500 cursor-pointer"
+                                >
+                            </td>
+                        `;
+                    }
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+
+            table.innerHTML = html;
+        }
+
+        // Toggle exclusion
+        function toggleExclusion(giver, receiver) {
+            if (!exclusions[giver]) {
+                exclusions[giver] = [];
+            }
+
+            const index = exclusions[giver].indexOf(receiver);
+            if (index === -1) {
+                // Ticking: add exclusion
+                exclusions[giver].push(receiver);
+                
+                // Make it mutual if receiver doesn't already exclude giver
+                if (!exclusions[receiver]) {
+                    exclusions[receiver] = [];
+                }
+                if (!exclusions[receiver].includes(giver)) {
+                    exclusions[receiver].push(giver);
+                    // Re-render to show both checkboxes ticked
+                    updateExclusionsMatrix();
+                }
+            } else {
+                // Unticking: remove exclusion (no side effects)
+                exclusions[giver].splice(index, 1);
+            }
+
+            validateConfiguration();
+        }
+
+        // Validate if a valid assignment is possible
+        function validateConfiguration() {
+            const btn = document.getElementById('shuffleBtn');
+            const msg = document.getElementById('minParticipantsMsg');
+            const validationMsg = document.getElementById('validationMessage');
+            const validationText = document.getElementById('validationText');
+
+            // Need at least 2 participants
+            if (participants.length < 2) {
+                btn.disabled = true;
+                msg.classList.remove('hidden');
+                msg.textContent = t.minParticipants;
+                validationMsg.classList.add('hidden');
+                return;
+            }
+
+            msg.classList.add('hidden');
+
+            // Check if valid assignment exists using Hungarian algorithm simulation
+            const isValid = canFindValidAssignment();
+
+            if (!isValid) {
+                btn.disabled = true;
+                validationMsg.classList.remove('hidden');
+                validationText.textContent = t.impossibleDesc;
+            } else {
+                btn.disabled = false;
+                validationMsg.classList.add('hidden');
+            }
+        }
+
+        // Check if a valid assignment exists (using backtracking)
+        function canFindValidAssignment() {
+            const n = participants.length;
+            const assignment = new Array(n).fill(-1);
+            const used = new Set();
+
+            function canAssign(giverIdx, receiverIdx) {
+                if (giverIdx === receiverIdx) return false;
+                const giver = participants[giverIdx];
+                const receiver = participants[receiverIdx];
+                return !exclusions[giver]?.includes(receiver);
+            }
+
+            function backtrack(giverIdx) {
+                if (giverIdx === n) return true;
+
+                for (let receiverIdx = 0; receiverIdx < n; receiverIdx++) {
+                    if (!used.has(receiverIdx) && canAssign(giverIdx, receiverIdx)) {
+                        assignment[giverIdx] = receiverIdx;
+                        used.add(receiverIdx);
+                        if (backtrack(giverIdx + 1)) return true;
+                        used.delete(receiverIdx);
+                        assignment[giverIdx] = -1;
+                    }
+                }
+                return false;
+            }
+
+            return backtrack(0);
+        }
+
+        // Find a random valid assignment
+        function findRandomAssignment() {
+            const n = participants.length;
+            const maxAttempts = 1000;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const shuffled = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+                const assignment = new Array(n).fill(-1);
+                const used = new Set();
+                let valid = true;
+
+                for (let i = 0; i < n && valid; i++) {
+                    const giverIdx = shuffled[i];
+                    let found = false;
+
+                    // Try receivers in random order
+                    const receivers = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+                    for (const receiverIdx of receivers) {
+                        if (!used.has(receiverIdx) &&
+                            giverIdx !== receiverIdx &&
+                            !exclusions[participants[giverIdx]]?.includes(participants[receiverIdx])) {
+                            assignment[giverIdx] = receiverIdx;
+                            used.add(receiverIdx);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) valid = false;
+                }
+
+                if (valid && used.size === n) {
+                    return assignment.map((receiverIdx, giverIdx) => ({
+                        giver: participants[giverIdx],
+                        receiver: participants[receiverIdx]
+                    }));
+                }
+            }
+
+            // Fallback to deterministic backtracking with random start
+            return findAssignmentBacktrack();
+        }
+
+        function findAssignmentBacktrack() {
+            const n = participants.length;
+            const assignment = new Array(n).fill(-1);
+            const used = new Set();
+            const order = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+
+            function canAssign(giverIdx, receiverIdx) {
+                if (giverIdx === receiverIdx) return false;
+                return !exclusions[participants[giverIdx]]?.includes(participants[receiverIdx]);
+            }
+
+            function backtrack(idx) {
+                if (idx === n) return true;
+                const giverIdx = order[idx];
+                const receivers = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+
+                for (const receiverIdx of receivers) {
+                    if (!used.has(receiverIdx) && canAssign(giverIdx, receiverIdx)) {
+                        assignment[giverIdx] = receiverIdx;
+                        used.add(receiverIdx);
+                        if (backtrack(idx + 1)) return true;
+                        used.delete(receiverIdx);
+                        assignment[giverIdx] = -1;
+                    }
+                }
+                return false;
+            }
+
+            if (backtrack(0)) {
+                return assignment.map((receiverIdx, giverIdx) => ({
+                    giver: participants[giverIdx],
+                    receiver: participants[receiverIdx]
+                }));
+            }
+            return null;
+        }
+
+        // Start shuffle with loading animation
+        function startShuffle() {
+            // Find assignment first
+            results = findRandomAssignment();
+
+            // Show loading page and start 3D animation
+            showPage('loadingPage');
+            startThreeAnimation();
+
+            // Animate progress bar
+            let progress = 0;
+            let messageIndex = 0;
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const loadingMessage = document.getElementById('loadingMessage');
+
+            const totalDuration = 3000; // 3 seconds total
+            const updateInterval = 30; // Update every 30ms for smooth animation
+            const increment = 100 / (totalDuration / updateInterval); // Linear increment
+
+            const interval = setInterval(() => {
+                progress += increment;
+
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+
+                    progressBar.style.width = '100%';
+                    progressText.textContent = '100%';
+
+                    // Show results after a brief pause
+                    setTimeout(() => {
+                        stopThreeAnimation();
+                        showPage('resultsPage');
+                        displayResults();
+                    }, 500);
+                } else {
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
+
+                    // Change message occasionally
+                    if (Math.random() < 0.05) {
+                        messageIndex = (messageIndex + 1) % t.loadingMessages.length;
+                        loadingMessage.textContent = t.loadingMessages[messageIndex];
+                    }
+                }
+            }, updateInterval);
+        }
+
+        // Display results with animation
+        function displayResults() {
+            const resultsList = document.getElementById('resultsList');
+
+            resultsList.innerHTML = results.map((r, i) => `
+                <div class="result-item flex items-center bg-white/20 rounded-lg px-4 py-3" style="animation-delay: ${i * 0.15}s">
+                    <span class="font-semibold flex-1">${escapeHtml(r.giver)}</span>
+                    <span class="text-2xl flex-shrink-0 mx-4">🎁➜</span>
+                    <span class="font-semibold text-green-400 flex-1 text-right">${escapeHtml(r.receiver)}</span>
+                </div>
+            `).join('');
+
+            // Trigger animations
+            setTimeout(() => {
+                document.querySelectorAll('.result-item').forEach((el, i) => {
+                    setTimeout(() => el.classList.add('fade-in'), i * 150);
+                });
+            }, 50);
+        }
+
+        // Copy results as text
+        function copyResults() {
+            const text = "🎅 Secret Santa 🎄\n\n" +
+                results.map(r => `${r.giver} → ${r.receiver}`).join('\n');
+
+            navigator.clipboard.writeText(text).then(() => {
+                showCopyConfirm();
+            });
+        }
+
+        function showCopyConfirm() {
+            const confirm = document.getElementById('copyConfirm');
+            confirm.textContent = t.copied;
+            confirm.classList.remove('hidden');
+            setTimeout(() => confirm.classList.add('hidden'), 2000);
+        }
+
+        // Go back to configuration page
+        function goBackToConfig() {
+            // Reset progress bar for next time
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressText').textContent = '0%';
+            document.getElementById('loadingMessage').textContent = t.loadingMessages[0];
+
+            showPage('configPage');
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeJs(text) {
+            return text.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        // Three.js Flying Presents Animation
+        let threeScene, threeCamera, threeRenderer, presents = [], snowflakes = [];
+        let animationFrameId = null;
+
+        function initThreeJS() {
+            const canvas = document.getElementById('threeCanvas');
+
+            // Scene
+            threeScene = new THREE.Scene();
+
+            // Camera
+            threeCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            threeCamera.position.z = 30;
+
+            // Renderer
+            threeRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            threeRenderer.setSize(window.innerWidth, window.innerHeight);
+            threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            threeScene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+            pointLight.position.set(10, 10, 10);
+            threeScene.add(pointLight);
+
+            // Create presents
+            createPresents();
+
+            // Create snowflakes
+            createSnowflakes();
+
+            // Handle resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createPresent() {
+            const group = new THREE.Group();
+
+            // Box
+            const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+            const boxColors = [0xe53e3e, 0x38a169, 0x3182ce, 0x805ad5, 0xd69e2e];
+            const boxMaterial = new THREE.MeshPhongMaterial({
+                color: boxColors[Math.floor(Math.random() * boxColors.length)],
+                shininess: 100
+            });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+            group.add(box);
+
+            // Ribbon horizontal
+            const ribbonGeometry1 = new THREE.BoxGeometry(2.1, 0.3, 2.1);
+            const ribbonMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffd700,
+                shininess: 150
+            });
+            const ribbon1 = new THREE.Mesh(ribbonGeometry1, ribbonMaterial);
+            ribbon1.position.y = 0.1;
+            group.add(ribbon1);
+
+            // Ribbon vertical
+            const ribbonGeometry2 = new THREE.BoxGeometry(0.3, 2.1, 2.1);
+            const ribbon2 = new THREE.Mesh(ribbonGeometry2, ribbonMaterial);
+            group.add(ribbon2);
+
+            // Bow
+            const bowGeometry = new THREE.TorusGeometry(0.4, 0.15, 8, 16);
+            const bow1 = new THREE.Mesh(bowGeometry, ribbonMaterial);
+            bow1.position.set(-0.4, 1.2, 0);
+            bow1.rotation.y = Math.PI / 2;
+            group.add(bow1);
+
+            const bow2 = new THREE.Mesh(bowGeometry, ribbonMaterial);
+            bow2.position.set(0.4, 1.2, 0);
+            bow2.rotation.y = Math.PI / 2;
+            group.add(bow2);
+
+            return group;
+        }
+
+        function createPresents() {
+            const numPresents = 15;
+
+            for (let i = 0; i < numPresents; i++) {
+                const present = createPresent();
+
+                // Random position
+                present.position.x = (Math.random() - 0.5) * 60;
+                present.position.y = (Math.random() - 0.5) * 40;
+                present.position.z = (Math.random() - 0.5) * 30 - 10;
+
+                // Random scale
+                const scale = 0.5 + Math.random() * 0.8;
+                present.scale.set(scale, scale, scale);
+
+                // Store velocity and rotation speed
+                present.userData = {
+                    velocityX: (Math.random() - 0.5) * 0.1,
+                    velocityY: (Math.random() - 0.5) * 0.1,
+                    rotationSpeedX: (Math.random() - 0.5) * 0.02,
+                    rotationSpeedY: (Math.random() - 0.5) * 0.02,
+                    rotationSpeedZ: (Math.random() - 0.5) * 0.02,
+                    floatOffset: Math.random() * Math.PI * 2,
+                    floatSpeed: 0.5 + Math.random() * 0.5
+                };
+
+                presents.push(present);
+                threeScene.add(present);
+            }
+        }
+
+        function createSnowflakes() {
+            const snowGeometry = new THREE.BufferGeometry();
+            const snowCount = 500;
+            const positions = new Float32Array(snowCount * 3);
+
+            for (let i = 0; i < snowCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 100;
+                positions[i + 1] = (Math.random() - 0.5) * 100;
+                positions[i + 2] = (Math.random() - 0.5) * 50;
+            }
+
+            snowGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const snowMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.3,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const snow = new THREE.Points(snowGeometry, snowMaterial);
+            snow.userData = { positions };
+            snowflakes.push(snow);
+            threeScene.add(snow);
+        }
+
+        function animateThreeJS() {
+            animationFrameId = requestAnimationFrame(animateThreeJS);
+
+            const time = Date.now() * 0.001;
+
+            // Animate presents
+            presents.forEach(present => {
+                const { velocityX, velocityY, rotationSpeedX, rotationSpeedY, rotationSpeedZ, floatOffset, floatSpeed } = present.userData;
+
+                // Floating motion
+                present.position.y += Math.sin(time * floatSpeed + floatOffset) * 0.02;
+                present.position.x += velocityX;
+
+                // Rotate
+                present.rotation.x += rotationSpeedX;
+                present.rotation.y += rotationSpeedY;
+                present.rotation.z += rotationSpeedZ;
+
+                // Wrap around screen
+                if (present.position.x > 35) present.position.x = -35;
+                if (present.position.x < -35) present.position.x = 35;
+                if (present.position.y > 25) present.position.y = -25;
+                if (present.position.y < -25) present.position.y = 25;
+            });
+
+            // Animate snowflakes
+            snowflakes.forEach(snow => {
+                const positions = snow.geometry.attributes.position.array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] -= 0.1;
+                    if (positions[i] < -50) {
+                        positions[i] = 50;
+                    }
+                }
+                snow.geometry.attributes.position.needsUpdate = true;
+            });
+
+            threeRenderer.render(threeScene, threeCamera);
+        }
+
+        function onWindowResize() {
+            if (threeCamera && threeRenderer) {
+                threeCamera.aspect = window.innerWidth / window.innerHeight;
+                threeCamera.updateProjectionMatrix();
+                threeRenderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+
+        function startThreeAnimation() {
+            if (!threeScene) {
+                initThreeJS();
+            }
+            animateThreeJS();
+        }
+
+        function stopThreeAnimation() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>
