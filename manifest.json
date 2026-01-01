@@ -1,7 +1,7 @@
 {
-  "name": "Secret Santa Shuffle",
-  "short_name": "SecretSanta",
-  "description": "Add participants, set exclusions, and shuffle Secret Santa assignments!",
+  "name": "Cacahuète Shuffle",
+  "short_name": "Cacahuete",
+  "description": "Add participants, set exclusions, and shuffle Cacahuète assignments!",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a1a2e",

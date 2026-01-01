@@ -1,4 +1,4 @@
-const CACHE_NAME = 'secret-santa-v1';
+const CACHE_NAME = 'cacahuete-v1';
 const urlsToCache = [
   './',
   './index.html',
@@ -32,18 +32,18 @@ self.addEventListener('fetch', event => {
         return fetch(event.request).then(
           response => {
             // Check if valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
-            
+
             // Clone the response
             const responseToCache = response.clone();
-            
+
             caches.open(CACHE_NAME)
               .then(cache => {
                 cache.put(event.request, responseToCache);
               });
-            
+
             return response;
           }
         );

@@ -4,24 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Add participants, set exclusions, and shuffle Secret Santa assignments!">
+    <meta name="description" content="Add participants, set exclusions, and shuffle Cacahuète assignments!">
     <meta name="theme-color" content="#16213e">
-    
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json">
-    
+
     <!-- iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Secret Santa">
+    <meta name="apple-mobile-web-app-title" content="Cacahuète">
     <link rel="apple-touch-icon" href="./icon-192.png">
-    
-    <!-- Icons -->
-    <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-    
-    <title>Secret Santa Shuffle</title>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <title>Cacahuète Shuffle</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
@@ -123,7 +122,7 @@
         <div class="container mx-auto px-4 py-8 max-w-4xl">
             <!-- Header -->
             <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold mb-2">🎅 Secret Santa Shuffle 🎄</h1>
+                <h1 class="text-4xl font-bold mb-2">🎅 Cacahuète Shuffle 🎄</h1>
                 <p id="subtitle" class="text-gray-300">Add participants, set exclusions, and shuffle!</p>
             </div>
 
@@ -206,7 +205,7 @@
         <div class="container mx-auto px-4 py-8 max-w-2xl">
             <div class="text-center mb-8">
                 <h1 class="text-4xl font-bold mb-2">🎁 <span id="resultsTitle">Results</span> 🎁</h1>
-                <p id="resultsSubtitle" class="text-gray-300">Here are the Secret Santa pairings!</p>
+                <p id="resultsSubtitle" class="text-gray-300">Here are the Cacahuète pairings!</p>
             </div>
 
             <div class="bg-white/10 backdrop-blur rounded-xl p-6 mb-6">
@@ -231,7 +230,7 @@
         // Translations
         const translations = {
             en: {
-                title: 'Secret Santa Shuffle',
+                title: 'Cacahuète Shuffle',
                 subtitle: 'Add participants, set exclusions, and shuffle!',
                 addParticipants: 'Add Participants',
                 placeholder: 'Enter participant name...',
@@ -245,7 +244,9 @@
                 minParticipants: 'Add at least 2 participants to shuffle',
                 loadingTitle: 'Shuffling the magic...',
                 resultsTitle: 'Results',
-                resultsSubtitle: 'Here are the Secret Santa pairings!',
+                resultsSubtitle: 'Here are the Cacahuète pairings!',
+                giver: 'Giver',
+                receiver: 'Receiver',
                 copyResults: 'Copy Results',
                 shuffleAgain: 'Shuffle Again',
                 copied: 'Copied to clipboard!',
@@ -262,7 +263,7 @@
                 ]
             },
             fr: {
-                title: 'Tirage au Sort Secret',
+                title: 'Tirage de la Cacahuète',
                 subtitle: 'Ajoutez des participants, définissez les exclusions, et mélangez !',
                 addParticipants: 'Ajouter des Participants',
                 placeholder: 'Entrez un nom...',
@@ -276,7 +277,9 @@
                 minParticipants: 'Ajoutez au moins 2 participants pour mélanger',
                 loadingTitle: 'La magie opère...',
                 resultsTitle: 'Résultats',
-                resultsSubtitle: 'Voici les associations du Secret Santa !',
+                resultsSubtitle: 'Voici les associations de la Cacahuète !',
+                giver: 'Père Noël',
+                receiver: 'Enfant sage',
                 copyResults: 'Copier les résultats',
                 shuffleAgain: 'Recommencer',
                 copied: 'Copié dans le presse-papiers !',
@@ -471,7 +474,7 @@
             if (index === -1) {
                 // Ticking: add exclusion
                 exclusions[giver].push(receiver);
-                
+
                 // Make it mutual if receiver doesn't already exclude giver
                 if (!exclusions[receiver]) {
                     exclusions[receiver] = [];
@@ -699,14 +702,58 @@
             }, 50);
         }
 
-        // Copy results as text
+        // Copy results as table (HTML + ASCII plain-text fallback)
         function copyResults() {
-            const text = "🎅 Secret Santa 🎄\n\n" +
-                results.map(r => `${r.giver} → ${r.receiver}`).join('\n');
+            const header = [t.giver, t.receiver];
 
-            navigator.clipboard.writeText(text).then(() => {
-                showCopyConfirm();
-            });
+            // Build ASCII table for plain-text clipboard (monospace-friendly)
+            function makeAsciiTable(header, rows) {
+                const cells = [header, ...rows.map(r => [r.giver, r.receiver])];
+                const widths = [0, 0];
+                for (let r of cells) {
+                    widths[0] = Math.max(widths[0], String(r[0]).length);
+                    widths[1] = Math.max(widths[1], String(r[1]).length);
+                }
+                const pad = (s, w) => String(s) + ' '.repeat(w - String(s).length);
+                const sep = '+' + '-'.repeat(widths[0] + 2) + '+' + '-'.repeat(widths[1] + 2) + '+';
+                const headerRow = `| ${pad(header[0], widths[0])} | ${pad(header[1], widths[1])} |`;
+                const rowsStr = rows.map(r => `| ${pad(r.giver, widths[0])} | ${pad(r.receiver, widths[1])} |`).join('\n');
+                return [sep, headerRow, sep, rowsStr, sep].join('\n');
+            }
+
+            const ascii = makeAsciiTable(header, results);
+
+            // HTML version (kept for rich editor paste)
+            const htmlTable = `
+                <table>
+                    <thead>
+                        <tr><th>${escapeHtml(header[0])}</th><th>${escapeHtml(header[1])}</th></tr>
+                    </thead>
+                    <tbody>
+                        ${results.map(r => `<tr><td>${escapeHtml(r.giver)}</td><td>${escapeHtml(r.receiver)}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Try to write both HTML and ASCII/plain text to the clipboard when supported
+            if (navigator.clipboard && navigator.clipboard.write) {
+                const blobPlain = new Blob([ascii], { type: 'text/plain' });
+                const blobHtml = new Blob([htmlTable], { type: 'text/html' });
+                const item = new ClipboardItem({
+                    'text/plain': blobPlain,
+                    'text/html': blobHtml
+                });
+
+                navigator.clipboard.write([item]).then(() => {
+                    showCopyConfirm();
+                }).catch(() => {
+                    // Fallback to ASCII plain text only
+                    navigator.clipboard.writeText(ascii).then(() => showCopyConfirm());
+                });
+            } else {
+                // Older browsers: ASCII plain text only
+                navigator.clipboard.writeText(ascii).then(() => showCopyConfirm());
+            }
         }
 
         function showCopyConfirm() {
